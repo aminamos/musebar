@@ -1,0 +1,79 @@
+name: MuseBar
+options:
+  bundleIdPrefix: codes.amos.musebar
+  deploymentTarget:
+    macOS: "14.0"
+    iOS: "17.0"
+  xcodeVersion: "15.0"
+settings:
+  base:
+    CODE_SIGN_STYLE: Manual
+    CODE_SIGN_IDENTITY: "-"
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    SWIFT_VERSION: "5.9"
+targets:
+  MuseBar:
+    type: application
+    platform: macOS
+    sources:
+      - path: Shared
+      - path: App
+    info:
+      path: App/Info.plist
+      properties:
+        LSUIElement: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: codes.amos.musebar.app
+        INFOPLIST_KEY_NSHumanReadableCopyright: ""
+    dependencies:
+      - target: MuseWidgets
+  MuseWidgets:
+    type: app-extension
+    platform: macOS
+    sources:
+      - path: Shared
+      - path: Widgets
+    info:
+      path: Widgets/Info.plist
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: codes.amos.musebar.app.widgets
+  MuseBarIOS:
+    type: application
+    platform: iOS
+    sources:
+      - path: iOSApp
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: codes.amos.musebar.ios
+        GENERATE_INFOPLIST_FILE: YES
+        TARGETED_DEVICE_FAMILY: "1,2"
+    dependencies:
+      - target: MuseBarWidgets
+  MuseBarWidgets:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: iOSApp/Models.swift
+      - path: iOSWidgets
+    info:
+      path: iOSWidgets/Info.plist
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: codes.amos.musebar.ios.widgets
+schemes:
+  MuseBarIOS:
+    build:
+      targets:
+        MuseBarIOS: all
+        MuseBarWidgets: all
+  MuseBar:
+    build:
+      targets:
+        MuseBar: all
+        MuseWidgets: all
+    run:
+      config: Debug
+      commandLineArguments: []

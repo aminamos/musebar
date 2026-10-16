@@ -1,0 +1,13 @@
+.DS_Store
+# Xcode / xcodegen (project is generated from project.yml)
+*.xcodeproj/
+DerivedData/
+build/
+xcuserdata/
+*.xcworkspace
+# Node / wrangler
+node_modules/
+.wrangler/
+# Local secrets & state (never commit)
+.musebar/
+*.log
