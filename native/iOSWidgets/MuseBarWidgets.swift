@@ -32,9 +32,9 @@ struct MuseWidgetView: View {
             VStack(alignment: .leading, spacing: 6) {
                 Text("⚡ Muse").font(.headline)
                 HStack(spacing: 14) {
-                    MiniStat(label: "Requests", value: "\(u.totalRequests)")
+                    MiniStat(label: "Requests", value: IOSFormat.grouped(u.totalRequests))
                     MiniStat(label: "Tokens", value: IOSFormat.tokens(u.tokens))
-                    MiniStat(label: "Cost", value: IOSFormat.cost(u.totalCost))
+                    MiniStat(label: "Cost est.", value: IOSFormat.cost(u.totalCost))
                 }
             }.padding(4)
         } else {

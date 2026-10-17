@@ -6,6 +6,10 @@ struct MuseBarApp: App {
     private let refreshTimer = Timer.publish(every: 60, on: .main, in: .common).autoconnect()
     @State private var stats: OmpStats?
     @State private var limits: LimitsFile?
+    @AppStorage("showRequests") private var showRequests = true
+    @AppStorage("showCost") private var showCost = true
+    @AppStorage("show5h") private var show5h = true
+    @AppStorage("showWeekly") private var showWeekly = true
 
     init() {
         _stats = State(initialValue: StatsStore.load())
@@ -24,10 +28,13 @@ struct MuseBarApp: App {
 
     var labelText: String {
         var parts: [String] = []
-        if let s = stats { parts.append("\(s.overall.totalRequests)") }
-        if let l = limits?.limit("300m") { parts.append("5h \(l.remainingPct)%") }
-        if let l = limits?.limit("1w") { parts.append("wk \(l.remainingPct)%") }
-        guard !parts.isEmpty else { return "⚡ …" }
+        if let s = stats {
+            if showRequests { parts.append(Format.grouped(s.overall.totalRequests)) }
+            if showCost { parts.append(Format.cost(s.overall.totalCost)) }
+        }
+        if show5h, let l = limits?.limit("300m") { parts.append("5h \(l.remainingPct)%") }
+        if showWeekly, let l = limits?.limit("1w") { parts.append("wk \(l.remainingPct)%") }
+        guard !parts.isEmpty else { return "⚡" }
         return "⚡ " + parts.joined(separator: " · ")
     }
 
@@ -42,33 +49,59 @@ struct MenuBarView: View {
     var stats: OmpStats?
     var limits: LimitsFile?
     var refresh: () -> Void
+    @AppStorage("showRequests") private var showRequests = true
+    @AppStorage("showTokens") private var showTokens = true
+    @AppStorage("showCost") private var showCost = true
+    @AppStorage("show5h") private var show5h = true
+    @AppStorage("showWeekly") private var showWeekly = true
+    @AppStorage("showPerModel") private var showPerModel = true
+    @State private var showSettings = false
+
+    private func limitVisible(_ l: LimitsFile.Limit) -> Bool {
+        switch l.id {
+        case "300m": return show5h
+        case "1w": return showWeekly
+        default: return true
+        }
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             if let s = stats {
                 Text("⚡ Muse Usage")
                     .font(.headline)
-                HStack(spacing: 16) {
-                    StatCell(label: "Requests", value: "\(s.overall.totalRequests)")
-                    StatCell(label: "Tokens", value: Format.tokens(s.tokens))
-                    StatCell(label: "Cost", value: Format.cost(s.overall.totalCost))
-                }
-                if let limits, !limits.limits.isEmpty {
-                    VStack(alignment: .leading, spacing: 4) {
-                        ForEach(limits.limits, id: \.id) { l in
-                            LimitRow(limit: l)
-                        }
+                if showRequests || showTokens || showCost {
+                    HStack(spacing: 16) {
+                        if showRequests { StatCell(label: "Requests", value: Format.grouped(s.overall.totalRequests)) }
+                        if showTokens { StatCell(label: "Tokens", value: Format.tokens(s.tokens)) }
+                        if showCost { StatCell(label: "Cost est.", value: Format.cost(s.overall.totalCost)) }
                     }
-                    Divider()
                 }
-                ForEach(s.byModel.prefix(6), id: \.model) { m in
-                    HStack {
-                        Text(m.shortName)
-                            .lineLimit(1)
-                        Spacer()
-                        Text("\(m.totalRequests) · \(Format.tokens(m.tokens)) · \(Format.cost(m.totalCost))")
-                            .foregroundStyle(.secondary)
-                            .font(.callout.monospacedDigit())
+                if let limits {
+                    let visible = limits.limits.filter(limitVisible)
+                    if !visible.isEmpty {
+                        VStack(alignment: .leading, spacing: 4) {
+                            ForEach(visible, id: \.id) { l in
+                                LimitRow(limit: l)
+                            }
+                        }
+                        Divider()
+                    }
+                }
+                if showPerModel {
+                    ForEach(s.byModel.prefix(6), id: \.model) { m in
+                        HStack {
+                            Text(m.shortName)
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                                .layoutPriority(0)
+                            Spacer(minLength: 8)
+                            Text("\(Format.grouped(m.totalRequests)) · \(Format.tokens(m.tokens)) · \(Format.cost(m.totalCost))")
+                                .foregroundStyle(.secondary)
+                                .font(.callout.monospacedDigit())
+                                .lineLimit(1)
+                                .layoutPriority(1)
+                        }
                     }
                 }
                 Text("Updated \(Format.time(StatsStore.modificationDate()))")
@@ -79,6 +112,27 @@ struct MenuBarView: View {
                     .foregroundStyle(.secondary)
             }
             Divider()
+            Button(showSettings ? "Hide settings" : "Settings…") {
+                showSettings.toggle()
+            }
+            if showSettings {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("SHOW")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                    Toggle("Requests", isOn: $showRequests)
+                    Toggle("Tokens", isOn: $showTokens)
+                    Toggle("Cost est.", isOn: $showCost)
+                    Toggle("5 Hours quota", isOn: $show5h)
+                    Toggle("Weekly quota", isOn: $showWeekly)
+                    Toggle("Per-model breakdown", isOn: $showPerModel)
+                    Text("Requests, Cost, 5h, and Weekly also apply to the menu bar label.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .toggleStyle(.checkbox)
+                .font(.callout)
+            }
             Button("Refresh now") {
                 refresh()
             }
@@ -89,7 +143,7 @@ struct MenuBarView: View {
             .keyboardShortcut("q")
         }
         .padding(12)
-        .frame(minWidth: 300)
+        .frame(minWidth: 400)
         .onAppear { refresh() }
     }
 }

@@ -41,9 +41,9 @@ struct MuseStatsWidgetView: View {
                         .foregroundStyle(.secondary)
                 }
                 HStack(spacing: 14) {
-                    MiniStat(label: "Requests", value: "\(s.overall.totalRequests)")
+                    MiniStat(label: "Requests", value: Format.grouped(s.overall.totalRequests))
                     MiniStat(label: "Tokens", value: Format.tokens(s.tokens))
-                    MiniStat(label: "Cost", value: Format.cost(s.overall.totalCost))
+                    MiniStat(label: "Cost est.", value: Format.cost(s.overall.totalCost))
                 }
                 if let limits = entry.limits, !limits.limits.isEmpty {
                     VStack(alignment: .leading, spacing: 4) {
@@ -82,7 +82,7 @@ struct MuseStatsWidgetView: View {
                                         .frame(width: max(3, geo.size.width * CGFloat(m.totalRequests) / CGFloat(maxReq)), height: 4)
                                 }
                                 .frame(height: 4)
-                                Text("\(m.totalRequests)")
+                                Text(Format.grouped(m.totalRequests))
                                     .font(.caption2.monospacedDigit())
                                     .foregroundStyle(.secondary)
                             }

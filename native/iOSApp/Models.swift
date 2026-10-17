@@ -83,14 +83,19 @@ struct DeparturesResponse: Decodable {
 }
 
 enum IOSFormat {
+    static func grouped(_ n: Int) -> String {
+        n.formatted(.number.grouping(.automatic))
+    }
+
     static func tokens(_ n: Int) -> String {
+        if n >= 1_000_000_000 { return String(format: "%.2fB", Double(n) / 1_000_000_000) }
         if n >= 1_000_000 { return String(format: "%.2fM", Double(n) / 1_000_000) }
         if n >= 1_000 { return String(format: "%.1fk", Double(n) / 1_000) }
         return "\(n)"
     }
     static func cost(_ n: Double?) -> String {
         guard let n else { return "–" }
-        return String(format: "$%.2f", n)
+        return n.formatted(.currency(code: "USD"))
     }
 }
 

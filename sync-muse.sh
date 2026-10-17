@@ -1,16 +1,29 @@
 #!/bin/bash
-# musebar sync: runs omp stats --json (stripping Syncing lines), writes ~/.musebar/latest.json,
-# and POSTs to Cloudflare if PUSH_URL secret exists.
+# musebar sync: aggregates Muse usage for the current weekly window
+# (Sun 7pm Central -> now) into ~/.musebar/latest.json via collect-muse.py,
+# fetches quota limits, and POSTs to Cloudflare if PUSH_URL secret exists.
+# Falls back to `omp stats --json` if the Muse session store is missing.
 set -u
 # launchd fires every 60s; jitter 0-180s so effective cadence is a random 1-4 min.
 # Set MUSEBAR_JITTER=0 for an immediate manual run.
 [ "${MUSEBAR_JITTER:-1}" = "1" ] && sleep $((RANDOM % 181))
-OUT="$HOME/.musebar/latest.json"
 mkdir -p "$HOME/.musebar"
-(command -v omp >/dev/null && omp stats --json 2>&1 || "$HOME/.local/bin/omp" stats --json 2>&1) | grep -v -e '^Syncing' -e '^Synced' > "$OUT.tmp"
-mv "$OUT.tmp" "$OUT"
+# Single-flight: a first (full-history) scan can outlast the launchd tick.
+LOCK="$HOME/.musebar/sync.lock"
+if ! mkdir "$LOCK" 2>/dev/null; then
+  # Reap a stale lock (holder killed mid-run) after 10 minutes.
+  if [ -n "$(find "$LOCK" -maxdepth 0 -mmin +10 2>/dev/null)" ]; then
+    rmdir "$LOCK" 2>/dev/null && mkdir "$LOCK" 2>/dev/null || { echo "sync already running; skipping" >&2; exit 0; }
+  else
+    echo "sync already running; skipping" >&2; exit 0
+  fi
+fi
+trap 'rmdir "$LOCK" 2>/dev/null' EXIT
+OUT="$HOME/.musebar/latest.json"
+DIR="$(cd "$(dirname "$0")" && pwd)"
 
-# quota limits (5h / weekly windows) via omp usage
+# quota limits (5h / weekly windows) via omp usage; fetched first because
+# collect-muse.py derives the weekly window start from the 1w limit.
 (command -v omp >/dev/null && omp usage --provider muse-code --json 2>/dev/null || "$HOME/.local/bin/omp" usage --provider muse-code --json 2>/dev/null) | python3 -c "
 import sys,json,datetime
 txt=sys.stdin.read(); i=txt.find('{')
@@ -27,7 +40,16 @@ if i>=0:
 json.dump({'fetchedAt':datetime.datetime.now(datetime.timezone.utc).isoformat(),'limits':limits},open('$HOME/.musebar/limits.json','w'),indent=2)
 " 2>/dev/null || echo '{"fetchedAt":null,"limits":[]}' > "$HOME/.musebar/limits.json"
 
+# requests / tokens / estimated cost from Muse session logs (weekly window)
+if ! python3 "$DIR/collect-muse.py"; then
+  echo "collect-muse.py failed; falling back to omp stats" >&2
+  (command -v omp >/dev/null && omp stats --json 2>&1 || "$HOME/.local/bin/omp" stats --json 2>&1) | grep -v -e '^Syncing' -e '^Synced' > "$OUT.tmp"
+  mv "$OUT.tmp" "$OUT"
+fi
+
 # push a small envelope to the musebar-sync worker (D1 + R2)
+PUSH_URL="${PUSH_URL:-}"
+if [ -z "$PUSH_URL" ] && [ -f "$HOME/.musebar/push_url" ]; then PUSH_URL="$(cat "$HOME/.musebar/push_url")"; fi
 PUSH_URL="${PUSH_URL:-https://YOUR-WORKER.workers.dev/push}"
 PUSH_SECRET="${PUSH_SECRET:-}"
 if [ -z "$PUSH_SECRET" ] && [ -f "$HOME/.musebar/push_secret" ]; then PUSH_SECRET="$(cat "$HOME/.musebar/push_secret")"; fi

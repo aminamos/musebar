@@ -10,15 +10,15 @@ struct ContentView: View {
                 Section("Muse Usage") {
                     if let u = usage {
                         HStack(spacing: 16) {
-                            StatCell(label: "Requests", value: "\(u.totalRequests)")
+                            StatCell(label: "Requests", value: IOSFormat.grouped(u.totalRequests))
                             StatCell(label: "Tokens", value: IOSFormat.tokens(u.tokens))
-                            StatCell(label: "Cost", value: IOSFormat.cost(u.totalCost))
+                            StatCell(label: "Cost est.", value: IOSFormat.cost(u.totalCost))
                         }
                         ForEach(u.byModel.prefix(6)) { m in
                             HStack {
                                 Text(m.shortName).lineLimit(1)
                                 Spacer()
-                                Text("\(m.totalRequests) · \(IOSFormat.tokens(m.tokens))")
+                                Text("\(IOSFormat.grouped(m.totalRequests)) · \(IOSFormat.tokens(m.tokens))")
                                     .foregroundStyle(.secondary).font(.callout)
                             }
                         }

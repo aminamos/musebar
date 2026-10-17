@@ -4,7 +4,7 @@ A CodexBar, but just for [Muse](https://codexbar.app/)-style quota tracking of *
 
 ## What it shows
 
-- **Requests / tokens / cost** — from `omp stats --json` (your local Muse session store).
+- **Requests / tokens / estimated cost** — from your local Muse session logs (`~/.local/share/muse/sessions`), aggregated by `collect-muse.py` over the current weekly window (Sunday 7pm Central → now). Muse models are subscription-covered with no published per-token price, so cost is an API-equivalent estimate from configurable rates (`~/.musebar/rates.json`); cache-read tokens are billed at 0.1× input, and cached input is not billed twice.
 - **5-hour & weekly quota windows** — `% left` + reset countdowns, from `omp usage --provider muse-code` (Muse Code Max Usage).
 - **Per-model breakdown** — requests, tokens, cost per model.
 - **Bus departures** — live E Line departures (Metro Transit NexTrip), stop-configurable.
@@ -13,7 +13,7 @@ A CodexBar, but just for [Muse](https://codexbar.app/)-style quota tracking of *
 
 ```
 Mac (launchd, every 1-4 min, jittered)
-  sync-muse.sh ── omp stats --json + omp usage --json
+  sync-muse.sh ── collect-muse.py (Muse logs, weekly window) + omp usage --json
         │  POST /push  (Bearer secret)
         ▼
 musebar-sync Worker ──► D1 (snapshots + per-model rows)
@@ -47,7 +47,8 @@ wrangler deploy                          # note your *.workers.dev URL
 
 # 2. Mac collector
 mkdir -p ~/.musebar && cp codes.amos.musebar-sync.plist ~/Library/LaunchAgents/
-# set PUSH_URL in sync-muse.sh to https://<your-worker>.workers.dev/push
+# save your worker URL + secret outside the repo:
+echo https://<your-worker>.workers.dev/push > ~/.musebar/push_url
 launchctl load ~/Library/LaunchAgents/codes.amos.musebar-sync.plist
 
 # 3. Native app + widgets
