@@ -143,7 +143,17 @@ struct MenuBarView: View {
             .keyboardShortcut("q")
         }
         .padding(12)
-        .frame(minWidth: 400)
+        .frame(width: 400)
+        // Toggling a Show option changes content size and the menu bar
+        // label; without this the popover animates its resize/re-anchor,
+        // which reads as the layout (and text) moving and scaling.
+        .transaction { $0.animation = nil }
+        .animation(nil, value: showRequests)
+        .animation(nil, value: showTokens)
+        .animation(nil, value: showCost)
+        .animation(nil, value: show5h)
+        .animation(nil, value: showWeekly)
+        .animation(nil, value: showPerModel)
         .onAppear { refresh() }
     }
 }
@@ -155,11 +165,13 @@ struct StatCell: View {
     var body: some View {
         VStack(alignment: .leading) {
             Text(label.uppercased())
-                .font(.caption2)
+                .font(.system(size: 10, weight: .semibold))
                 .foregroundStyle(.secondary)
             Text(value)
-                .font(.title3.bold().monospacedDigit())
+                .font(.system(size: 20, weight: .bold).monospacedDigit())
+                .lineLimit(1)
         }
+        .frame(minWidth: 104, alignment: .leading)
     }
 }
 
