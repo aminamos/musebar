@@ -49,7 +49,8 @@ struct LimitsFile: Decodable {
         var durationMs: Double?
 
         var shortLabel: String { id == "300m" ? "5h" : (id == "1w" ? "wk" : label) }
-        var remainingPct: Int { Int((remainingFraction * 100).rounded()) }
+        var remainingPct: Int { min(100, max(0, Int((remainingFraction * 100).rounded()))) }
+        var clampedUsedFraction: Double { min(1, max(0, usedFraction)) }
 
         var resetsInText: String {
             guard let resetsAt else { return "" }

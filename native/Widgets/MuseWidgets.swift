@@ -36,9 +36,13 @@ struct MuseStatsWidgetView: View {
                     Text("⚡ Muse")
                         .font(.headline)
                     Spacer()
-                    Text(Format.time(entry.updated))
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
+                    if family != .systemSmall {
+                        Text(Format.time(entry.updated))
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
+                    }
                 }
                 HStack(spacing: 14) {
                     MiniStat(label: "Requests", value: Format.grouped(s.overall.totalRequests))
@@ -54,15 +58,20 @@ struct MuseStatsWidgetView: View {
                                     .frame(width: 46, alignment: .leading)
                                 GeometryReader { geo in
                                     RoundedRectangle(cornerRadius: 2)
-                                        .fill(l.usedFraction > 0.8 ? Color.red : Color.accentColor.opacity(0.85))
-                                        .frame(width: max(3, geo.size.width * CGFloat(l.usedFraction)), height: 4)
+                                        .fill(l.clampedUsedFraction > 0.8 ? Color.red : Color.accentColor.opacity(0.85))
+                                        .frame(width: max(3, geo.size.width * CGFloat(l.clampedUsedFraction)), height: 4)
                                 }
                                 .frame(height: 4)
                                 Text("\(l.remainingPct)% left")
                                     .font(.caption2.monospacedDigit().bold())
-                                Text("· \(l.resetsInText)")
-                                    .font(.caption2)
-                                    .foregroundStyle(.secondary)
+                                    .lineLimit(1)
+                                    .layoutPriority(1)
+                                if family != .systemSmall {
+                                    Text("· \(l.resetsInText)")
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                        .lineLimit(1)
+                                }
                             }
                         }
                     }
@@ -85,6 +94,8 @@ struct MuseStatsWidgetView: View {
                                 Text(Format.grouped(m.totalRequests))
                                     .font(.caption2.monospacedDigit())
                                     .foregroundStyle(.secondary)
+                                    .lineLimit(1)
+                                    .layoutPriority(1)
                             }
                         }
                     }
@@ -114,6 +125,8 @@ struct MiniStat: View {
                 .foregroundStyle(.secondary)
             Text(value)
                 .font(.headline.monospacedDigit())
+                .lineLimit(1)
+                .minimumScaleFactor(0.55)
         }
     }
 }

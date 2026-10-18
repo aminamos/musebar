@@ -70,25 +70,40 @@ struct MenuBarView: View {
             if let s = stats {
                 Text("⚡ Muse Usage")
                     .font(.headline)
-                if showRequests || showTokens || showCost {
+                // While Settings is open, hidden sections keep their
+                // space (rendered invisible) so toggling a checkbox can
+                // never resize the popover or move the controls under
+                // the cursor. Closing Settings collapses them again.
+                if showRequests || showTokens || showCost || showSettings {
                     HStack(spacing: 16) {
-                        if showRequests { StatCell(label: "Requests", value: Format.grouped(s.overall.totalRequests)) }
-                        if showTokens { StatCell(label: "Tokens", value: Format.tokens(s.tokens)) }
-                        if showCost { StatCell(label: "Cost est.", value: Format.cost(s.overall.totalCost)) }
+                        if showRequests || showSettings {
+                            StatCell(label: "Requests", value: Format.grouped(s.overall.totalRequests))
+                                .opacity(showRequests ? 1 : 0)
+                        }
+                        if showTokens || showSettings {
+                            StatCell(label: "Tokens", value: Format.tokens(s.tokens))
+                                .opacity(showTokens ? 1 : 0)
+                        }
+                        if showCost || showSettings {
+                            StatCell(label: "Cost est.", value: Format.cost(s.overall.totalCost))
+                                .opacity(showCost ? 1 : 0)
+                        }
                     }
                 }
-                if let limits {
-                    let visible = limits.limits.filter(limitVisible)
-                    if !visible.isEmpty {
+                if let limits, !limits.limits.isEmpty {
+                    if limits.limits.contains(where: limitVisible) || showSettings {
                         VStack(alignment: .leading, spacing: 4) {
-                            ForEach(visible, id: \.id) { l in
-                                LimitRow(limit: l)
+                            ForEach(limits.limits, id: \.id) { l in
+                                if limitVisible(l) || showSettings {
+                                    LimitRow(limit: l)
+                                        .opacity(limitVisible(l) ? 1 : 0)
+                                }
                             }
                         }
                         Divider()
                     }
                 }
-                if showPerModel {
+                if showPerModel || showSettings {
                     ForEach(s.byModel.prefix(6), id: \.model) { m in
                         HStack {
                             Text(m.shortName)
@@ -102,6 +117,7 @@ struct MenuBarView: View {
                                 .lineLimit(1)
                                 .layoutPriority(1)
                         }
+                        .opacity(showPerModel ? 1 : 0)
                     }
                 }
                 Text("Updated \(Format.time(StatsStore.modificationDate()))")
@@ -170,6 +186,7 @@ struct StatCell: View {
             Text(value)
                 .font(.system(size: 20, weight: .bold).monospacedDigit())
                 .lineLimit(1)
+                .minimumScaleFactor(0.7)
         }
         .frame(minWidth: 104, alignment: .leading)
     }
@@ -195,8 +212,8 @@ struct LimitRow: View {
                     RoundedRectangle(cornerRadius: 3)
                         .fill(Color.secondary.opacity(0.2))
                     RoundedRectangle(cornerRadius: 3)
-                        .fill(limit.usedFraction > 0.8 ? Color.red : (limit.usedFraction > 0.5 ? Color.orange : Color.accentColor))
-                        .frame(width: geo.size.width * CGFloat(limit.usedFraction))
+                        .fill(limit.clampedUsedFraction > 0.8 ? Color.red : (limit.clampedUsedFraction > 0.5 ? Color.orange : Color.accentColor))
+                        .frame(width: geo.size.width * CGFloat(limit.clampedUsedFraction))
                 }
             }
             .frame(height: 5)

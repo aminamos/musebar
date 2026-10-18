@@ -16,10 +16,16 @@ struct ContentView: View {
                         }
                         ForEach(u.byModel.prefix(6)) { m in
                             HStack {
-                                Text(m.shortName).lineLimit(1)
-                                Spacer()
+                                Text(m.shortName)
+                                    .lineLimit(1)
+                                    .truncationMode(.middle)
+                                    .layoutPriority(0)
+                                Spacer(minLength: 8)
                                 Text("\(IOSFormat.grouped(m.totalRequests)) · \(IOSFormat.tokens(m.tokens))")
-                                    .foregroundStyle(.secondary).font(.callout)
+                                    .foregroundStyle(.secondary)
+                                    .font(.callout.monospacedDigit())
+                                    .lineLimit(1)
+                                    .layoutPriority(1)
                             }
                         }
                     } else {
@@ -61,7 +67,10 @@ struct StatCell: View {
     var body: some View {
         VStack(alignment: .leading) {
             Text(label.uppercased()).font(.caption2).foregroundStyle(.secondary)
-            Text(value).font(.title3.bold())
+            Text(value)
+                .font(.title3.bold().monospacedDigit())
+                .lineLimit(1)
+                .minimumScaleFactor(0.65)
         }
     }
 }

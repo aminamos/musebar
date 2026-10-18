@@ -115,7 +115,10 @@ struct MiniStat: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 1) {
             Text(label.uppercased()).font(.caption2).foregroundStyle(.secondary)
-            Text(value).font(.headline)
+            Text(value)
+                .font(.headline.monospacedDigit())
+                .lineLimit(1)
+                .minimumScaleFactor(0.55)
         }
     }
 }
