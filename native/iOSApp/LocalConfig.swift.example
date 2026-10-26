@@ -1,0 +1,9 @@
+// Copy this file to LocalConfig.swift (same folder) and fill in your own
+// values. LocalConfig.swift is gitignored: never commit real endpoints or
+// tokens. Both the iOS app and its widgets compile this enum in.
+enum LocalConfig {
+    /// Base URL of your musebar-sync worker, no trailing slash.
+    static let workerBaseURL = "https://YOUR-WORKER.workers.dev"
+    /// The worker's READ_SECRET (read-only; not the push secret).
+    static let readToken = "YOUR-READ-SECRET"
+}

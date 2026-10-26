@@ -11,3 +11,4 @@ node_modules/
 # Local secrets & state (never commit)
 .musebar/
 *.log
+native/iOSApp/LocalConfig.swift

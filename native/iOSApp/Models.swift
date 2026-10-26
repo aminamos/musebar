@@ -116,14 +116,18 @@ enum IOSFormat {
 }
 
 enum API {
-    static let usageURL = URL(string: "https://YOUR-WORKER.workers.dev/api/usage")!
+    // Real worker URL and read token live in LocalConfig.swift, which is
+    // gitignored. Copy LocalConfig.swift.example to LocalConfig.swift and
+    // fill it in. Placeholders here keep this tracked file secret-free.
+    static var usageURL: URL { URL(string: "\(LocalConfig.workerBaseURL)/api/usage")! }
+    static var weeksURL: URL { URL(string: "\(LocalConfig.workerBaseURL)/api/weeks")! }
     static let busURL = URL(string: "https://YOUR-GHOSTBUS-WORKER.workers.dev/api/departures?stop=17941&route=E")!
-    static let weeksURL = URL(string: "https://YOUR-WORKER.workers.dev/api/weeks")!
     // Read token for the worker's /api/* endpoints (worker READ_SECRET).
     // Read-only by design: never put the push secret in an app binary.
-    static let readToken = "YOUR-READ-SECRET"
+    static var readToken: String { LocalConfig.readToken }
 
     static func authed(_ url: URL) -> URLRequest {
+        assert(readToken != "YOUR-READ-SECRET", "Set the read token in LocalConfig.swift (copy LocalConfig.swift.example first)")
         var r = URLRequest(url: url)
         r.setValue("Bearer \(readToken)", forHTTPHeaderField: "Authorization")
         return r

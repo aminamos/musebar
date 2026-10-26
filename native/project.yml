@@ -57,6 +57,7 @@ targets:
     platform: iOS
     sources:
       - path: iOSApp/Models.swift
+      - path: iOSApp/LocalConfig.swift
       - path: iOSWidgets
     info:
       path: iOSWidgets/Info.plist
