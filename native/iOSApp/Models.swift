@@ -119,14 +119,23 @@ enum API {
     static let usageURL = URL(string: "https://YOUR-WORKER.workers.dev/api/usage")!
     static let busURL = URL(string: "https://YOUR-GHOSTBUS-WORKER.workers.dev/api/departures?stop=17941&route=E")!
     static let weeksURL = URL(string: "https://YOUR-WORKER.workers.dev/api/weeks")!
+    // Read token for the worker's /api/* endpoints (worker READ_SECRET).
+    // Read-only by design: never put the push secret in an app binary.
+    static let readToken = "YOUR-READ-SECRET"
+
+    static func authed(_ url: URL) -> URLRequest {
+        var r = URLRequest(url: url)
+        r.setValue("Bearer \(readToken)", forHTTPHeaderField: "Authorization")
+        return r
+    }
 
     static func fetchUsage() async -> UsageResponse? {
-        guard let (data, _) = try? await URLSession.shared.data(from: usageURL) else { return nil }
+        guard let (data, _) = try? await URLSession.shared.data(for: authed(usageURL)) else { return nil }
         return try? JSONDecoder().decode(UsageResponse.self, from: data)
     }
 
     static func fetchWeeks() async -> [WeekUsage] {
-        guard let (data, _) = try? await URLSession.shared.data(from: weeksURL) else { return [] }
+        guard let (data, _) = try? await URLSession.shared.data(for: authed(weeksURL)) else { return [] }
         return (try? JSONDecoder().decode(WeeksResponse.self, from: data))?.weeks ?? []
     }
     static func fetchDepartures() async -> [Departure] {

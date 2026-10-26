@@ -44,6 +44,7 @@ wrangler d1 create musebar-stats        # put the id in wrangler.jsonc
 wrangler r2 bucket create musebar-snapshots
 wrangler d1 execute musebar-stats --remote --file schema.sql
 wrangler secret put PUSH_SECRET         # save the same value to ~/.musebar/push_secret (chmod 600)
+wrangler secret put READ_SECRET         # read token for /api/*; save to ~/.musebar/read_secret (chmod 600)
 wrangler deploy                          # note your *.workers.dev URL
 
 # 2. Mac collector
@@ -63,6 +64,7 @@ cd native && xcodegen generate && open MuseBar.xcodeproj
 - Quota percentages are Muse's own (`usedFraction` from the provider API); MuseBar never estimates them.
 - The push secret lives only in `~/.musebar/push_secret` and the worker's `PUSH_SECRET` — never in this repo.
 - Existing installs, one-time upgrade for previous weeks: re-apply `cloudflare/schema.sql` to D1 (creates the `weeks` table), redeploy the worker, then let the sync run. The first run after the upgrade does one full rescan of the Muse session logs to rebuild history that older builds pruned, so it may take longer than usual.
+- Read endpoints (`/api/usage`, `/api/weeks`, `/api/history`) require `Authorization: Bearer <READ_SECRET>` and fail closed (401) when it is unset. Set the same token as `API.readToken` in `iOSApp/Models.swift` before building the iOS app/widgets. It is a separate token from `PUSH_SECRET` on purpose: a token extracted from an app binary must never be able to write. The macOS app reads local files and needs no token.
 - Personal endpoints/IDs in this repo are placeholders (`YOUR-WORKER.workers.dev`, `REPLACE_WITH_YOUR_D1_ID`) — drop in your own.
 
 ## License

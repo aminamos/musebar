@@ -5,6 +5,7 @@
  *
  * Push:    POST /push  (Authorization: Bearer <PUSH_SECRET>)
  * Reads:   GET /api/usage, GET /api/history?limit=&host=, GET /health
+ *          (/api/* reads require Authorization: Bearer <READ_SECRET>)
  */
 
 function json(data, status = 200, cacheMaxAge = 0) {
@@ -213,13 +214,21 @@ async function handleWeeks(request, env) {
   return json({ weeks }, 200, 300);
 }
 
+const READ_PATHS = new Set(["/api/usage", "/api/weeks", "/api/history"]);
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     if (request.method === "POST" && url.pathname === "/push") return handlePush(request, env);
-    if (request.method === "GET" && url.pathname === "/api/usage") return handleUsage(request, env);
-    if (request.method === "GET" && url.pathname === "/api/weeks") return handleWeeks(request, env);
-    if (request.method === "GET" && url.pathname === "/api/history") return handleHistory(request, env);
+    // Read endpoints carry usage history and hostname; they are not public.
+    // READ_SECRET is separate from PUSH_SECRET so a token extracted from an
+    // app binary can never write. Fail closed if it is unset.
+    if (request.method === "GET" && READ_PATHS.has(url.pathname)) {
+      if (!bearerOk(request, env.READ_SECRET)) return unauthorized();
+      if (url.pathname === "/api/usage") return handleUsage(request, env);
+      if (url.pathname === "/api/weeks") return handleWeeks(request, env);
+      return handleHistory(request, env);
+    }
     if (request.method === "GET" && (url.pathname === "/health" || url.pathname === "/api/health")) {
       return json({ ok: true, worker: "musebar-sync" });
     }
