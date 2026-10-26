@@ -30,6 +30,31 @@ function bearerOk(request, secret) {
   return diff === 0;
 }
 
+async function upsertWeeks(env, hostname, weeks) {
+  if (!Array.isArray(weeks) || !weeks.length) return;
+  const batch = weeks.filter((w) => w && w.windowStart).map((w) => {
+    const o = w.overall || {};
+    return env.STATS_DB.prepare(
+      `INSERT INTO weeks (hostname, window_start, window_end, total_requests,
+        total_input_tokens, total_output_tokens, total_cost, by_model_json, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%SZ','now'))
+       ON CONFLICT(hostname, window_start) DO UPDATE SET
+        window_end = excluded.window_end,
+        total_requests = excluded.total_requests,
+        total_input_tokens = excluded.total_input_tokens,
+        total_output_tokens = excluded.total_output_tokens,
+        total_cost = excluded.total_cost,
+        by_model_json = excluded.by_model_json,
+        updated_at = excluded.updated_at`
+    ).bind(
+      hostname, String(w.windowStart), String(w.windowEnd || ""),
+      o.totalRequests || 0, o.totalInputTokens || 0, o.totalOutputTokens || 0,
+      o.totalCost ?? null, JSON.stringify(Array.isArray(w.byModel) ? w.byModel : [])
+    );
+  });
+  if (batch.length) await env.STATS_DB.batch(batch);
+}
+
 async function handlePush(request, env) {
   if (!bearerOk(request, env.PUSH_SECRET)) return unauthorized();
   let body;
@@ -43,6 +68,9 @@ async function handlePush(request, env) {
   const omp = body.omp || body; // accept raw `omp stats --json` too
   const overall = omp.overall || {};
   const byModel = Array.isArray(omp.byModel) ? omp.byModel : [];
+  // Record weekly history even when the current week is unchanged (the
+  // dedup early-return below would otherwise drop a rebuilt history).
+  try { await upsertWeeks(env, hostname, omp.weeks); } catch { /* weeks table may not exist pre-migration; non-fatal */ }
 
   // Skip redundant writes when nothing changed since the last push.
   const prev = await env.STATS_DB.prepare(
@@ -64,7 +92,7 @@ async function handlePush(request, env) {
   }
 
   const r2Key = `stats/${hostname}/${collectedAt}.json`;
-  const stored = { collectedAt, pushedAt: new Date().toISOString(), hostname, omp: { overall, byModel, limits: Array.isArray(omp.limits) ? omp.limits : [] } };
+  const stored = { collectedAt, pushedAt: new Date().toISOString(), hostname, omp: { overall, byModel, weeks: Array.isArray(omp.weeks) ? omp.weeks : [], limits: Array.isArray(omp.limits) ? omp.limits : [] } };
   try {
     await env.SNAPSHOT_BUCKET.put(r2Key, JSON.stringify(stored), {
       httpMetadata: { contentType: "application/json" },
@@ -162,11 +190,35 @@ async function handleHistory(request, env) {
   return json({ points: rows.results || [] }, 200, 300);
 }
 
+async function handleWeeks(request, env) {
+  const url = new URL(request.url);
+  const limit = Math.min(Math.max(parseInt(url.searchParams.get("limit") || "26", 10) || 26, 1), 52);
+  const host = url.searchParams.get("host");
+  const rows = host
+    ? await env.STATS_DB.prepare(
+        "SELECT * FROM weeks WHERE hostname = ? ORDER BY window_start DESC LIMIT ?"
+      ).bind(host, limit).all()
+    : await env.STATS_DB.prepare(
+        "SELECT * FROM weeks WHERE hostname = (SELECT hostname FROM latest) ORDER BY window_start DESC LIMIT ?"
+      ).bind(limit).all();
+  const weeks = (rows.results || []).map((r) => ({
+    windowStart: r.window_start,
+    windowEnd: r.window_end,
+    totalRequests: r.total_requests,
+    totalInputTokens: r.total_input_tokens,
+    totalOutputTokens: r.total_output_tokens,
+    totalCost: r.total_cost,
+    byModel: (() => { try { return JSON.parse(r.by_model_json || "[]"); } catch { return []; } })(),
+  }));
+  return json({ weeks }, 200, 300);
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     if (request.method === "POST" && url.pathname === "/push") return handlePush(request, env);
     if (request.method === "GET" && url.pathname === "/api/usage") return handleUsage(request, env);
+    if (request.method === "GET" && url.pathname === "/api/weeks") return handleWeeks(request, env);
     if (request.method === "GET" && url.pathname === "/api/history") return handleHistory(request, env);
     if (request.method === "GET" && (url.pathname === "/health" || url.pathname === "/api/health")) {
       return json({ ok: true, worker: "musebar-sync" });

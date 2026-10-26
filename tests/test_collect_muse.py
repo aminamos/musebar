@@ -57,11 +57,11 @@ class CollectTest(unittest.TestCase):
     def tearDown(self):
         self.tmp.cleanup()
 
-    def run_collect(self):
+    def run_collect(self, now=NOW_S):
         r = subprocess.run(
             [sys.executable, COLLECT, "--sessions-dir", self.sessions,
              "--state-dir", self.state, "--limits", self.limits,
-             "--out", self.out, "--now", str(NOW_S)],
+             "--out", self.out, "--now", str(now)],
             capture_output=True, text=True)
         self.assertEqual(r.returncode, 0, r.stderr)
         with open(self.out) as fh:
@@ -97,6 +97,24 @@ class CollectTest(unittest.TestCase):
         # Third run, no appends: unchanged.
         stats = self.run_collect()
         self.assertEqual(stats["overall"]["totalRequests"], 3)
+
+    def test_previous_week_kept_separate(self):
+        stats = self.run_collect()
+        self.assertEqual(len(stats["weeks"]), 2)
+        current, previous = stats["weeks"]
+        self.assertEqual(current["windowStart"], stats["windowStart"])
+        self.assertEqual(current["overall"]["totalRequests"], 2)
+        # The START_S-10 event belongs to the previous week, not the bin.
+        self.assertEqual(previous["overall"]["totalRequests"], 1)
+        self.assertEqual(previous["overall"]["totalInputTokens"], 9_000_000)
+        self.assertEqual(previous["byModel"][0]["model"], "muse-wonder-1.0")
+
+    def test_events_survive_window_rollover(self):
+        self.run_collect()
+        stats = self.run_collect(now=START_S + 604_800 + 3600)
+        self.assertEqual(stats["overall"]["totalRequests"], 0)
+        self.assertEqual(stats["weeks"][0]["overall"]["totalRequests"], 2)
+        self.assertEqual(stats["weeks"][1]["overall"]["totalRequests"], 1)
 
 
 class WeekWindowFallbackTest(unittest.TestCase):

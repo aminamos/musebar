@@ -36,5 +36,21 @@ CREATE TABLE IF NOT EXISTS by_model (
   PRIMARY KEY (snapshot_id, model)
 );
 
+-- One row per (host, weekly window): final totals for current + previous
+-- weeks, upserted on every push so apps can page back through history.
+-- Apply to an existing DB with: wrangler d1 execute musebar-stats --remote --file schema.sql
+CREATE TABLE IF NOT EXISTS weeks (
+  hostname TEXT NOT NULL DEFAULT '',
+  window_start TEXT NOT NULL,
+  window_end TEXT NOT NULL DEFAULT '',
+  total_requests INTEGER NOT NULL DEFAULT 0,
+  total_input_tokens INTEGER NOT NULL DEFAULT 0,
+  total_output_tokens INTEGER NOT NULL DEFAULT 0,
+  total_cost REAL,
+  by_model_json TEXT NOT NULL DEFAULT '[]',
+  updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now')),
+  PRIMARY KEY (hostname, window_start)
+);
+
 CREATE VIEW IF NOT EXISTS latest AS
 SELECT * FROM snapshots ORDER BY collected_at DESC LIMIT 1;

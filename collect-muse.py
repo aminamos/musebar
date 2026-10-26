@@ -169,56 +169,7 @@ def atomic_write(path, text):
         raise
 
 
-def collect(sessions_dir, state_dir, limits_path, rates_path, out_path, now_s):
-    start_s = week_window(now_s, limits_path)
-    rates = load_rates(rates_path)
-    os.makedirs(state_dir, exist_ok=True)
-    events_path = os.path.join(state_dir, "muse-events.jsonl")
-    offsets_path = os.path.join(state_dir, "muse-offsets.json")
-
-    events = []
-    try:
-        with open(events_path) as fh:
-            for line in fh:
-                try:
-                    row = json.loads(line)
-                except ValueError:
-                    continue
-                if row[0] >= start_s:
-                    events.append(tuple(row))
-    except OSError:
-        pass
-    try:
-        with open(offsets_path) as fh:
-            offsets = {k: int(v) for k, v in json.load(fh).items()}
-    except Exception:
-        offsets = {}
-
-    for root, _dirs, files in os.walk(sessions_dir):
-        if "session.jsonl" not in files:
-            continue
-        path = os.path.join(root, "session.jsonl")
-        try:
-            st = os.stat(path)
-        except OSError:
-            continue
-        offset = offsets.get(path)
-        if offset is None:
-            if st.st_mtime < start_s:
-                offsets[path] = st.st_size  # nothing in-window; mark seen
-                continue
-            offset = 0
-        if st.st_size < offset:
-            offset = 0  # truncated/rotated; rescan
-        if st.st_size == offset:
-            continue
-        new_events, offsets[path] = parse_appended(path, offset)
-        events.extend(e for e in new_events if e[0] >= start_s)
-
-    events = [e for e in events if start_s <= e[0] <= now_s + 60]
-    atomic_write(events_path, "".join(json.dumps(list(e)) + "\n" for e in events))
-    atomic_write(offsets_path, json.dumps(offsets))
-
+def aggregate(events, rates):
     overall = {"totalRequests": 0, "successfulRequests": 0, "failedRequests": 0,
                "totalInputTokens": 0, "totalOutputTokens": 0,
                "totalCacheReadTokens": 0, "totalCacheWriteTokens": 0,
@@ -239,14 +190,92 @@ def collect(sessions_dir, state_dir, limits_path, rates_path, out_path, now_s):
             agg["totalCacheWriteTokens"] += cache_write
             agg["totalCost"] += cost
     overall["successfulRequests"] = overall["totalRequests"]
+    return overall, sorted(by_model.values(), key=lambda m: -m["totalRequests"])
+
+
+MAX_WEEKS = 52
+
+
+def collect(sessions_dir, state_dir, limits_path, rates_path, out_path, now_s):
+    start_s = week_window(now_s, limits_path)
+    week_s = WEEK_MS / 1000.0
+    rates = load_rates(rates_path)
+    os.makedirs(state_dir, exist_ok=True)
+    events_path = os.path.join(state_dir, "muse-events.jsonl")
+    offsets_path = os.path.join(state_dir, "muse-offsets.json")
+    # Pre-history builds pruned muse-events.jsonl to the current week and
+    # marked old session files as seen, so previous weeks are unrecoverable
+    # from state alone. One full rescan of the session logs rebuilds them.
+    marker_path = os.path.join(state_dir, "muse-history-v2")
+    rescan = not os.path.exists(marker_path)
+
+    events = []
+    if not rescan:
+        try:
+            with open(events_path) as fh:
+                for line in fh:
+                    try:
+                        row = json.loads(line)
+                        if len(row) >= 6:
+                            events.append(tuple(row))
+                    except (ValueError, TypeError):
+                        continue
+        except OSError:
+            pass
+    offsets = {}
+    if not rescan:
+        try:
+            with open(offsets_path) as fh:
+                offsets = {k: int(v) for k, v in json.load(fh).items()}
+        except Exception:
+            offsets = {}
+
+    for root, _dirs, files in os.walk(sessions_dir):
+        if "session.jsonl" not in files:
+            continue
+        path = os.path.join(root, "session.jsonl")
+        try:
+            st = os.stat(path)
+        except OSError:
+            continue
+        offset = offsets.get(path, 0)
+        if st.st_size < offset:
+            offset = 0  # truncated/rotated; rescan
+        if st.st_size == offset:
+            offsets[path] = offset
+            continue
+        new_events, offsets[path] = parse_appended(path, offset)
+        events.extend(new_events)
+
+    events = sorted(e for e in events if e[0] <= now_s + 60)
+    atomic_write(events_path, "".join(json.dumps(list(e)) + "\n" for e in events))
+    atomic_write(offsets_path, json.dumps(offsets))
+    atomic_write(marker_path, "2\n")
+
+    by_week = {}
+    for e in events:
+        idx = int((e[0] - start_s) // week_s)
+        by_week.setdefault(idx, []).append(e)
+    weeks = []
+    for idx in sorted(by_week, reverse=True)[:MAX_WEEKS]:
+        w_start = start_s + idx * week_s
+        w_overall, w_by_model = aggregate(by_week[idx], rates)
+        weeks.append({
+            "windowStart": datetime.fromtimestamp(w_start, timezone.utc).isoformat(),
+            "windowEnd": datetime.fromtimestamp(w_start + week_s, timezone.utc).isoformat(),
+            "overall": w_overall,
+            "byModel": w_by_model,
+        })
+    overall, by_model = aggregate(by_week.get(0, []), rates)
 
     payload = {
         "source": "muse",
         "costEstimated": True,
         "windowStart": datetime.fromtimestamp(start_s, timezone.utc).isoformat(),
+        "windowEnd": datetime.fromtimestamp(start_s + week_s, timezone.utc).isoformat(),
         "overall": overall,
-        "byModel": sorted(by_model.values(),
-                          key=lambda m: -m["totalRequests"]),
+        "byModel": by_model,
+        "weeks": weeks,
         "byFolder": [], "byAgentType": [], "timeSeries": [],
         "modelSeries": [], "modelPerformanceSeries": [], "costSeries": [],
     }

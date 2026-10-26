@@ -4,6 +4,17 @@ import Foundation
 struct OmpStats: Decodable {
     var overall: Overall = Overall()
     var byModel: [ModelStats] = []
+    var windowStart: String?
+    var weeks: [WeekStats] = []
+
+    struct WeekStats: Decodable {
+        var windowStart: String?
+        var windowEnd: String?
+        var overall: Overall = Overall()
+        var byModel: [ModelStats] = []
+
+        var tokens: Int { overall.totalInputTokens + overall.totalOutputTokens }
+    }
 
     struct Overall: Decodable {
         var totalRequests = 0
@@ -117,6 +128,14 @@ enum Format {
     static func cost(_ n: Double?) -> String {
         guard let n else { return "–" }
         return n.formatted(.currency(code: "USD"))
+    }
+
+    static func weekLabel(_ iso: String?, index: Int) -> String {
+        if index == 0 { return "This week" }
+        guard let iso, let d = ISO8601DateFormatter().date(from: iso) else { return "Week \(index + 1) ago" }
+        let f = DateFormatter()
+        f.dateFormat = "MMM d"
+        return "Week of \(f.string(from: d))"
     }
 
     static func time(_ d: Date?) -> String {

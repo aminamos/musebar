@@ -3,12 +3,49 @@ import SwiftUI
 struct ContentView: View {
     @State private var usage: UsageResponse?
     @State private var departures: [Departure] = []
+    @State private var weeks: [WeekUsage] = []
+    @State private var weekIndex = 0
+
+    private var displayedUsage: UsageResponse? {
+        if weeks.indices.contains(weekIndex) {
+            let w = weeks[weekIndex]
+            var u = UsageResponse()
+            u.totalRequests = w.totalRequests
+            u.totalInputTokens = w.totalInputTokens
+            u.totalOutputTokens = w.totalOutputTokens
+            u.totalCost = w.totalCost
+            u.byModel = w.byModel
+            return u
+        }
+        return usage
+    }
+
+    private func weekLabel(_ w: WeekUsage) -> String {
+        if weekIndex == 0 { return "This week" }
+        guard let d = ISO8601DateFormatter().date(from: w.windowStart) else { return "Earlier week" }
+        let f = DateFormatter()
+        f.dateFormat = "MMM d"
+        return "Week of \(f.string(from: d))"
+    }
 
     var body: some View {
         NavigationStack {
             List {
                 Section("Muse Usage") {
-                    if let u = usage {
+                    if let u = displayedUsage {
+                        if !weeks.isEmpty {
+                            HStack {
+                                Button { weekIndex += 1 } label: { Image(systemName: "chevron.left") }
+                                    .disabled(weekIndex >= weeks.count - 1)
+                                Spacer()
+                                Text(weekLabel(weeks[weekIndex]))
+                                    .font(.callout)
+                                    .foregroundStyle(.secondary)
+                                Spacer()
+                                Button { weekIndex -= 1 } label: { Image(systemName: "chevron.right") }
+                                    .disabled(weekIndex == 0)
+                            }
+                        }
                         HStack(spacing: 16) {
                             StatCell(label: "Requests", value: IOSFormat.grouped(u.totalRequests))
                             StatCell(label: "Tokens", value: IOSFormat.tokens(u.tokens))
@@ -56,8 +93,11 @@ struct ContentView: View {
     func load() async {
         async let u = API.fetchUsage()
         async let b = API.fetchDepartures()
+        async let w = API.fetchWeeks()
         usage = await u
         departures = await b
+        weeks = await w
+        if weekIndex >= weeks.count { weekIndex = max(0, weeks.count - 1) }
     }
 }
 

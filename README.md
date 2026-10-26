@@ -7,6 +7,7 @@ A CodexBar, but just for [Muse](https://codexbar.app/)-style quota tracking of *
 - **Requests / tokens / estimated cost** — from your local Muse session logs (`~/.local/share/muse/sessions`), aggregated by `collect-muse.py` over the current weekly window (Sunday 7pm Central → now). Muse models are subscription-covered with no published per-token price, so cost is an API-equivalent estimate from configurable rates (`~/.musebar/rates.json`); cache-read tokens are billed at 0.1× input, and cached input is not billed twice.
 - **5-hour & weekly quota windows** — `% left` + reset countdowns, from `omp usage --provider muse-code` (Muse Code Max Usage).
 - **Per-model breakdown** — requests, tokens, cost per model.
+- **Previous weeks** — the collector retains every event (grouped by weekly window, up to 52 weeks in the payload) instead of pruning to the current week, so the macOS popover and iOS app can page back with the chevron buttons. The worker stores one row per week in a D1 `weeks` table, served at `GET /api/weeks`.
 - **Bus departures** — live E Line departures (Metro Transit NexTrip), stop-configurable.
 
 ## Architecture
@@ -61,6 +62,7 @@ cd native && xcodegen generate && open MuseBar.xcodeproj
 
 - Quota percentages are Muse's own (`usedFraction` from the provider API); MuseBar never estimates them.
 - The push secret lives only in `~/.musebar/push_secret` and the worker's `PUSH_SECRET` — never in this repo.
+- Existing installs, one-time upgrade for previous weeks: re-apply `cloudflare/schema.sql` to D1 (creates the `weeks` table), redeploy the worker, then let the sync run. The first run after the upgrade does one full rescan of the Muse session logs to rebuild history that older builds pruned, so it may take longer than usual.
 - Personal endpoints/IDs in this repo are placeholders (`YOUR-WORKER.workers.dev`, `REPLACE_WITH_YOUR_D1_ID`) — drop in your own.
 
 ## License

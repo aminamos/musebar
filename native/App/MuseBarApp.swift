@@ -56,6 +56,7 @@ struct MenuBarView: View {
     @AppStorage("showWeekly") private var showWeekly = true
     @AppStorage("showPerModel") private var showPerModel = true
     @State private var showSettings = false
+    @State private var weekIndex = 0
 
     private func limitVisible(_ l: LimitsFile.Limit) -> Bool {
         switch l.id {
@@ -68,8 +69,28 @@ struct MenuBarView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             if let s = stats {
-                Text("⚡ Muse Usage")
-                    .font(.headline)
+                let week = s.weeks.indices.contains(weekIndex) ? s.weeks[weekIndex] : nil
+                let dispOverall = week?.overall ?? s.overall
+                let dispModels = week?.byModel ?? s.byModel
+                let dispTokens = dispOverall.totalInputTokens + dispOverall.totalOutputTokens
+                HStack {
+                    Text("⚡ Muse Usage")
+                        .font(.headline)
+                    Spacer()
+                    if !s.weeks.isEmpty {
+                        Button { weekIndex += 1 } label: { Image(systemName: "chevron.left") }
+                            .buttonStyle(.borderless)
+                            .disabled(weekIndex >= s.weeks.count - 1)
+                            .help("Previous week")
+                        Text(Format.weekLabel(week?.windowStart ?? s.windowStart, index: weekIndex))
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                        Button { weekIndex -= 1 } label: { Image(systemName: "chevron.right") }
+                            .buttonStyle(.borderless)
+                            .disabled(weekIndex == 0)
+                            .help("Next week")
+                    }
+                }
                 // While Settings is open, hidden sections keep their
                 // space (rendered invisible) so toggling a checkbox can
                 // never resize the popover or move the controls under
@@ -77,20 +98,20 @@ struct MenuBarView: View {
                 if showRequests || showTokens || showCost || showSettings {
                     HStack(spacing: 16) {
                         if showRequests || showSettings {
-                            StatCell(label: "Requests", value: Format.grouped(s.overall.totalRequests))
+                            StatCell(label: "Requests", value: Format.grouped(dispOverall.totalRequests))
                                 .opacity(showRequests ? 1 : 0)
                         }
                         if showTokens || showSettings {
-                            StatCell(label: "Tokens", value: Format.tokens(s.tokens))
+                            StatCell(label: "Tokens", value: Format.tokens(dispTokens))
                                 .opacity(showTokens ? 1 : 0)
                         }
                         if showCost || showSettings {
-                            StatCell(label: "Cost est.", value: Format.cost(s.overall.totalCost))
+                            StatCell(label: "Cost est.", value: Format.cost(dispOverall.totalCost))
                                 .opacity(showCost ? 1 : 0)
                         }
                     }
                 }
-                if let limits, !limits.limits.isEmpty {
+                if weekIndex == 0, let limits, !limits.limits.isEmpty {
                     if limits.limits.contains(where: limitVisible) || showSettings {
                         VStack(alignment: .leading, spacing: 4) {
                             ForEach(limits.limits, id: \.id) { l in
@@ -104,7 +125,7 @@ struct MenuBarView: View {
                     }
                 }
                 if showPerModel || showSettings {
-                    ForEach(s.byModel.prefix(6), id: \.model) { m in
+                    ForEach(dispModels.prefix(6), id: \.model) { m in
                         HStack {
                             Text(m.shortName)
                                 .lineLimit(1)

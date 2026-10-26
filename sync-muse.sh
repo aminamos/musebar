@@ -61,7 +61,7 @@ try: lim=json.load(open(sys.argv[2]))
 except Exception: lim={}
 print(json.dumps({"collectedAt":datetime.datetime.now(datetime.timezone.utc).isoformat(),
   "hostname":socket.gethostname().split(".")[0],
-  "omp":{"overall":src.get("overall",{}),"byModel":src.get("byModel",[]),"limits":lim.get("limits",[]),"limitsFetchedAt":lim.get("fetchedAt")}}))
+  "omp":{"overall":src.get("overall",{}),"byModel":src.get("byModel",[]),"windowStart":src.get("windowStart"),"windowEnd":src.get("windowEnd"),"weeks":src.get("weeks",[]),"limits":lim.get("limits",[]),"limitsFetchedAt":lim.get("fetchedAt")}}))
 EOF
   curl -fsS -m 20 -X POST -H 'Content-Type: application/json' \
     -H "Authorization: Bearer $PUSH_SECRET" \

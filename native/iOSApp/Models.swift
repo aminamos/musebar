@@ -49,6 +49,22 @@ struct UsageModel: Decodable, Identifiable {
     }
 }
 
+struct WeekUsage: Decodable, Identifiable {
+    var id: String { windowStart }
+    var windowStart = ""
+    var windowEnd = ""
+    var totalRequests = 0
+    var totalInputTokens = 0
+    var totalOutputTokens = 0
+    var totalCost: Double?
+    var byModel: [UsageModel] = []
+    var tokens: Int { totalInputTokens + totalOutputTokens }
+}
+
+struct WeeksResponse: Decodable {
+    var weeks: [WeekUsage] = []
+}
+
 struct Departure: Decodable, Identifiable {
     var id: String { "\(route)-\(minutes)-\(destination)" }
     var route: String = ""
@@ -102,10 +118,16 @@ enum IOSFormat {
 enum API {
     static let usageURL = URL(string: "https://YOUR-WORKER.workers.dev/api/usage")!
     static let busURL = URL(string: "https://YOUR-GHOSTBUS-WORKER.workers.dev/api/departures?stop=17941&route=E")!
+    static let weeksURL = URL(string: "https://YOUR-WORKER.workers.dev/api/weeks")!
 
     static func fetchUsage() async -> UsageResponse? {
         guard let (data, _) = try? await URLSession.shared.data(from: usageURL) else { return nil }
         return try? JSONDecoder().decode(UsageResponse.self, from: data)
+    }
+
+    static func fetchWeeks() async -> [WeekUsage] {
+        guard let (data, _) = try? await URLSession.shared.data(from: weeksURL) else { return [] }
+        return (try? JSONDecoder().decode(WeeksResponse.self, from: data))?.weeks ?? []
     }
     static func fetchDepartures() async -> [Departure] {
         guard let (data, _) = try? await URLSession.shared.data(from: busURL) else { return [] }
