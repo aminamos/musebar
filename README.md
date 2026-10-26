@@ -55,7 +55,8 @@ launchctl load ~/Library/LaunchAgents/codes.amos.musebar-sync.plist
 
 # 3. Native app + widgets
 cd native && xcodegen generate && open MuseBar.xcodeproj
-# set the endpoint URLs in iOSApp/Models.swift, build & run MuseBar
+# cp iOSApp/LocalConfig.swift.example iOSApp/LocalConfig.swift and fill in
+# workerBaseURL + readToken (LocalConfig.swift is gitignored), build & run MuseBar
 # right-click desktop → Edit Widgets → add "Muse Usage"
 ```
 
@@ -64,7 +65,7 @@ cd native && xcodegen generate && open MuseBar.xcodeproj
 - Quota percentages are Muse's own (`usedFraction` from the provider API); MuseBar never estimates them.
 - The push secret lives only in `~/.musebar/push_secret` and the worker's `PUSH_SECRET` — never in this repo.
 - Existing installs, one-time upgrade for previous weeks: re-apply `cloudflare/schema.sql` to D1 (creates the `weeks` table), redeploy the worker, then let the sync run. The first run after the upgrade does one full rescan of the Muse session logs to rebuild history that older builds pruned, so it may take longer than usual.
-- Read endpoints (`/api/usage`, `/api/weeks`, `/api/history`) require `Authorization: Bearer <READ_SECRET>` and fail closed (401) when it is unset. Set the same token as `API.readToken` in `iOSApp/Models.swift` before building the iOS app/widgets. It is a separate token from `PUSH_SECRET` on purpose: a token extracted from an app binary must never be able to write. The macOS app reads local files and needs no token.
+- Read endpoints (`/api/usage`, `/api/weeks`, `/api/history`) require `Authorization: Bearer <READ_SECRET>` and fail closed (401) when it is unset. Before building the iOS app/widgets, copy `iOSApp/LocalConfig.swift.example` to `iOSApp/LocalConfig.swift` (gitignored) and set `workerBaseURL` and `readToken` there. Never put real values in the tracked `Models.swift`. It is a separate token from `PUSH_SECRET` on purpose: a token extracted from an app binary must never be able to write. The macOS app reads local files and needs no token.
 - Personal endpoints/IDs in this repo are placeholders (`YOUR-WORKER.workers.dev`, `REPLACE_WITH_YOUR_D1_ID`) — drop in your own.
 
 ## License

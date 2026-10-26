@@ -127,7 +127,9 @@ enum API {
     static var readToken: String { LocalConfig.readToken }
 
     static func authed(_ url: URL) -> URLRequest {
-        assert(readToken != "YOUR-READ-SECRET", "Set the read token in LocalConfig.swift (copy LocalConfig.swift.example first)")
+        // precondition, not assert: assert is stripped in release builds, and
+        // a copied-but-unedited LocalConfig would otherwise 401 silently.
+        precondition(readToken != "YOUR-READ-SECRET", "Set the read token in LocalConfig.swift (copy LocalConfig.swift.example first)")
         var r = URLRequest(url: url)
         r.setValue("Bearer \(readToken)", forHTTPHeaderField: "Authorization")
         return r
