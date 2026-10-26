@@ -21,11 +21,15 @@ struct ContentView: View {
     }
 
     private func weekLabel(_ w: WeekUsage) -> String {
-        if weekIndex == 0 { return "This week" }
-        guard let d = ISO8601DateFormatter().date(from: w.windowStart) else { return "Earlier week" }
-        let f = DateFormatter()
-        f.dateFormat = "MMM d"
-        return "Week of \(f.string(from: d))"
+        let f = ISO8601DateFormatter()
+        if let start = f.date(from: w.windowStart), let end = f.date(from: w.windowEnd),
+           start <= Date(), Date() < end {
+            return "This week"
+        }
+        guard let d = f.date(from: w.windowStart) else { return "Earlier week" }
+        let df = DateFormatter()
+        df.dateFormat = "MMM d"
+        return "Week of \(df.string(from: d))"
     }
 
     var body: some View {

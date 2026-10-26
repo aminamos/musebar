@@ -113,8 +113,12 @@ class CollectTest(unittest.TestCase):
         self.run_collect()
         stats = self.run_collect(now=START_S + 604_800 + 3600)
         self.assertEqual(stats["overall"]["totalRequests"], 0)
-        self.assertEqual(stats["weeks"][0]["overall"]["totalRequests"], 2)
-        self.assertEqual(stats["weeks"][1]["overall"]["totalRequests"], 1)
+        # Current week is present (empty), not silently last week's totals.
+        self.assertEqual(len(stats["weeks"]), 3)
+        self.assertEqual(stats["weeks"][0]["windowStart"], stats["windowStart"])
+        self.assertEqual(stats["weeks"][0]["overall"]["totalRequests"], 0)
+        self.assertEqual(stats["weeks"][1]["overall"]["totalRequests"], 2)
+        self.assertEqual(stats["weeks"][2]["overall"]["totalRequests"], 1)
 
 
 class WeekWindowFallbackTest(unittest.TestCase):

@@ -14,6 +14,18 @@ struct OmpStats: Decodable {
         var byModel: [ModelStats] = []
 
         var tokens: Int { overall.totalInputTokens + overall.totalOutputTokens }
+
+        enum CodingKeys: String, CodingKey { case windowStart, windowEnd, overall, byModel }
+
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            windowStart = try c.decodeIfPresent(String.self, forKey: .windowStart)
+            windowEnd = try c.decodeIfPresent(String.self, forKey: .windowEnd)
+            overall = try c.decodeIfPresent(Overall.self, forKey: .overall) ?? Overall()
+            byModel = try c.decodeIfPresent([ModelStats].self, forKey: .byModel) ?? []
+        }
+
+        init() {}
     }
 
     struct Overall: Decodable {
@@ -44,6 +56,19 @@ struct OmpStats: Decodable {
     }
 
     var tokens: Int { overall.totalInputTokens + overall.totalOutputTokens }
+
+    enum CodingKeys: String, CodingKey { case overall, byModel, windowStart, weeks }
+
+    // decodeIfPresent throughout: payloads written before weekly history
+    // (and the `omp stats --json` fallback) have no weeks/windowStart keys,
+    // and synthesized Decodable does not fall back to property defaults.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        overall = try c.decodeIfPresent(Overall.self, forKey: .overall) ?? Overall()
+        byModel = try c.decodeIfPresent([ModelStats].self, forKey: .byModel) ?? []
+        windowStart = try c.decodeIfPresent(String.self, forKey: .windowStart)
+        weeks = try c.decodeIfPresent([WeekStats].self, forKey: .weeks) ?? []
+    }
 }
 
 // Quota windows from `omp usage`, written by the sync script.
@@ -130,9 +155,9 @@ enum Format {
         return n.formatted(.currency(code: "USD"))
     }
 
-    static func weekLabel(_ iso: String?, index: Int) -> String {
-        if index == 0 { return "This week" }
-        guard let iso, let d = ISO8601DateFormatter().date(from: iso) else { return "Week \(index + 1) ago" }
+    static func weekLabel(_ iso: String?, isCurrent: Bool) -> String {
+        if isCurrent { return "This week" }
+        guard let iso, let d = ISO8601DateFormatter().date(from: iso) else { return "Earlier week" }
         let f = DateFormatter()
         f.dateFormat = "MMM d"
         return "Week of \(f.string(from: d))"

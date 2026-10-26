@@ -256,6 +256,7 @@ def collect(sessions_dir, state_dir, limits_path, rates_path, out_path, now_s):
     for e in events:
         idx = int((e[0] - start_s) // week_s)
         by_week.setdefault(idx, []).append(e)
+    by_week.setdefault(0, [])  # current week exists even with no events yet
     weeks = []
     for idx in sorted(by_week, reverse=True)[:MAX_WEEKS]:
         w_start = start_s + idx * week_s

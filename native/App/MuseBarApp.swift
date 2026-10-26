@@ -82,7 +82,7 @@ struct MenuBarView: View {
                             .buttonStyle(.borderless)
                             .disabled(weekIndex >= s.weeks.count - 1)
                             .help("Previous week")
-                        Text(Format.weekLabel(week?.windowStart ?? s.windowStart, index: weekIndex))
+                        Text(Format.weekLabel(week?.windowStart ?? s.windowStart, isCurrent: week == nil || week?.windowStart == s.windowStart))
                             .font(.callout)
                             .foregroundStyle(.secondary)
                         Button { weekIndex -= 1 } label: { Image(systemName: "chevron.right") }
@@ -192,6 +192,9 @@ struct MenuBarView: View {
         .animation(nil, value: showWeekly)
         .animation(nil, value: showPerModel)
         .onAppear { refresh() }
+        .onChange(of: stats?.weeks.count ?? 0) { _, count in
+            weekIndex = min(weekIndex, max(0, count - 1))
+        }
     }
 }
 
